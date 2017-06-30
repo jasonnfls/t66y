@@ -6,6 +6,7 @@ import (
     "strings"
     "os"
     "fmt"
+    "net"
     "log"
     "time"
     "sync"
@@ -21,7 +22,13 @@ var dirMutex sync.Mutex
 var sem = make(chan int, 4)
 
 var netClient = &http.Client{
-    Timeout: time.Second * 5,
+    Timeout: time.Second * 60,
+    Transport: &http.Transport{
+        Dial: (&net.Dialer{
+            Timeout: 60 * time.Second,
+        }).Dial,
+        TLSHandshakeTimeout: 60 * time.Second,
+    },
 }
 
 func Crawl(url, title, date string) {

@@ -6,11 +6,11 @@ export GOPATH
 all: listing page
 
 listing: bin/listing
-bin/listing: src/listing.go src/common/utils.go
+bin/listing: src/listing.go src/common/utils.go src/page/logic.go
 	go build -o bin/listing src/listing.go
 
 page: bin/page
-bin/page: src/page.go src/common/utils.go
+bin/page: src/page.go src/common/utils.go src/page/logic.go
 	go build -o bin/page src/page.go
 
 clean:

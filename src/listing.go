@@ -1,6 +1,8 @@
 package main
 
 import (
+    "net"
+    "net/http"
     "log"
     "fmt"
     "strings"
@@ -14,16 +16,28 @@ import (
 var untilDate string
 var fromDate string
 var debug bool
+var page int
 
 func init() {
     today := time.Now().Format("2006-01-02")
     flag.StringVar(&untilDate, "until", today, "Until")
     flag.StringVar(&fromDate, "from", today, "From")
     flag.BoolVar(&debug, "debug", false, "debug")
+    flag.IntVar(&page, "page", 1, "starting page")
     flag.Parse()
     if fromDate < untilDate {
         log.Fatal("Wrong date range", fromDate, untilDate)
     }
+}
+
+var netClient = &http.Client{
+    Timeout: time.Second * 60,
+    Transport: &http.Transport{
+        Dial: (&net.Dialer{
+            Timeout: 60 * time.Second,
+        }).Dial,
+        TLSHandshakeTimeout: 60 * time.Second,
+    },
 }
 
 type Post struct {
@@ -40,7 +54,18 @@ func listingPage(page int) []Post{
     } else {
         url = fmt.Sprintf("http://www.t66y.com/thread0806.php?fid=8&search=&page=%d", page)
     }
-    doc, err := goquery.NewDocument(url)
+    request, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0")
+    request.Header.Add("Accept-Encoding", "gzip")
+    response, err := netClient.Do(request)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    doc, err := goquery.NewDocumentFromResponse(response)
     if err != nil {
         log.Fatal(err)
     }
@@ -87,12 +112,16 @@ func filterPost (post *Post) bool {
 }
 
 func main(){
+    limiter := time.Tick(time.Second * 6)
     outer:
-    for page:=1;;page++ {
+    for ;page<100;page++ {
         if debug {
             fmt.Println("page:",page)
         }
         for _, post := range listingPage(page) {
+            if debug {
+                fmt.Println(post.date, post.title)
+            }
             if fromDate < post.date {
                 continue
             }
@@ -101,13 +130,14 @@ func main(){
             }
             if filterPost(&post) {
                 if debug {
-                    fmt.Println(post)
+                    fmt.Println("selected: ", post)
                 } else {
                     url := fmt.Sprintf("http://www.t66y.com/%s", post.url)
                     P.Crawl(url, post.title, post.date)
                 }
             }
         }
+        <-limiter
     }
 }
 
